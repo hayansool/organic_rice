@@ -21,6 +21,11 @@ const PRODUCTS = {
 
 const STORAGE_KEY = "saecheongmu-orders";
 const FARM_ADDRESS = "주소를 입력해 주세요";
+const PAYMENT_ACCOUNT = {
+  bank: "IBK기업은행",
+  number: "237-132742-04-012",
+  holder: "농업회사법인 하얀술 주식회사",
+} as const;
 const money = (value: number) => new Intl.NumberFormat("ko-KR").format(value);
 
 export default function Home() {
@@ -88,6 +93,12 @@ export default function Home() {
     window.setTimeout(() => setMessage(""), 3000);
   }
 
+  async function copyAccount() {
+    await navigator.clipboard.writeText(PAYMENT_ACCOUNT.number);
+    setMessage("입금 계좌번호가 복사되었습니다.");
+    window.setTimeout(() => setMessage(""), 3000);
+  }
+
   function downloadCsv() {
     const rows = [["주문일", "이름", "전화번호", "주소", "용량", "수량", "금액"], ...orders.map((o) => [new Date(o.createdAt).toLocaleDateString("ko-KR"), o.name, o.phone, o.address, o.size, o.quantity, o.total])];
     const csv = "\uFEFF" + rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
@@ -135,6 +146,14 @@ export default function Home() {
               </div></fieldset>
               <div className="quantity-row"><div><b>수량</b><small>필요한 포대 수를 선택해 주세요.</small></div><div className="stepper"><button type="button" aria-label="수량 줄이기" onClick={() => setQuantity(Math.max(1, quantity - 1))}>−</button><output>{quantity}</output><button type="button" aria-label="수량 늘리기" onClick={() => setQuantity(quantity + 1)}>＋</button></div></div>
               <div className="total-row"><span>총 주문 금액</span><strong>{money(total)}<small>원</small></strong></div>
+              <section className="payment-box" aria-labelledby="payment-title">
+                <div className="payment-title"><span>입금처</span><small>무통장 입금</small></div>
+                <div className="payment-account">
+                  <div><p id="payment-title">{PAYMENT_ACCOUNT.bank}</p><strong>{PAYMENT_ACCOUNT.number}</strong><small>예금주 · {PAYMENT_ACCOUNT.holder}</small></div>
+                  <button type="button" onClick={copyAccount} aria-label="입금 계좌번호 복사">계좌 복사</button>
+                </div>
+                <p className="payment-note">주문자 이름과 입금자 이름을 동일하게 입력해 주세요.</p>
+              </section>
               <button className="submit" type="submit">이 내용으로 주문하기 <span>→</span></button>
               <p className="privacy">입력하신 정보는 주문 및 배송 목적으로만 사용됩니다.</p>
             </form>
