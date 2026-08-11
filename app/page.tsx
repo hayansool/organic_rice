@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 
 type Size = "10kg" | "20kg";
 type Order = {
@@ -19,7 +19,6 @@ const PRODUCTS = {
   "20kg": 78000,
 } as const;
 
-const STORAGE_KEY = "saecheongmu-orders";
 const FARM_ADDRESS = "주소를 입력해 주세요";
 const PAYMENT_ACCOUNT = {
   bank: "IBK기업은행",
@@ -34,19 +33,9 @@ export default function Home() {
   const [size, setSize] = useState<Size>("10kg");
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState("");
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try { setOrders(JSON.parse(saved)); } catch { localStorage.removeItem(STORAGE_KEY); }
-    }
-    setLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (loaded) localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-  }, [orders, loaded]);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const total = PRODUCTS[size] * quantity;
   const summary = useMemo(() => orders.reduce((acc, order) => {
@@ -56,24 +45,40 @@ export default function Home() {
     return acc;
   }, { count: 0, amount: 0, "10kg": 0, "20kg": 0 }), [orders]);
 
-  function submitOrder(event: FormEvent<HTMLFormElement>) {
+  async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setLoading(true);
     const form = new FormData(event.currentTarget);
-    const order: Order = {
-      id: crypto.randomUUID(),
-      name: String(form.get("name")),
-      address: String(form.get("address")),
-      phone: String(form.get("phone")),
-      size,
-      quantity,
-      total,
-      createdAt: new Date().toISOString(),
-    };
-    setOrders((current) => [order, ...current]);
-    event.currentTarget.reset();
-    setQuantity(1);
-    setMessage(`${order.name}님의 주문이 접수되었습니다.`);
+    const name = String(form.get("name"));
+    try {
+      const response = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, address: form.get("address"), phone: form.get("phone"), size, quantity }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      event.currentTarget.reset();
+      setQuantity(1);
+      setMessage(`${name}님의 주문이 접수되었습니다.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "주문을 접수하지 못했습니다.");
+    } finally { setLoading(false); }
     window.setTimeout(() => setMessage(""), 4000);
+  }
+
+  async function unlockOrders(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    const response = await fetch("/api/orders", { headers: { "x-admin-password": adminPassword } });
+    const result = await response.json();
+    setLoading(false);
+    if (!response.ok) { setMessage(result.error); window.setTimeout(() => setMessage(""), 3500); return; }
+    setOrders(result);
+    setAdminUnlocked(true);
+  }
+
+  async function deleteOrder(id: string) {
+    if (!confirm("이 주문을 삭제할까요?")) return;
+    const response = await fetch(`/api/orders?id=${encodeURIComponent(id)}`, { method: "DELETE", headers: { "x-admin-password": adminPassword } });
+    if (response.ok) setOrders(orders.filter((item) => item.id !== id));
+    else setMessage("주문을 삭제하지 못했습니다.");
   }
 
   function orderText() {
@@ -154,19 +159,20 @@ export default function Home() {
                 </div>
                 <p className="payment-note">주문자 이름과 입금자 이름을 동일하게 입력해 주세요.</p>
               </section>
-              <button className="submit" type="submit">이 내용으로 주문하기 <span>→</span></button>
+              <button className="submit" type="submit" disabled={loading}>{loading ? "주문 접수 중…" : "이 내용으로 주문하기"} <span>→</span></button>
               <p className="privacy">입력하신 정보는 주문 및 배송 목적으로만 사용됩니다.</p>
             </form>
           </section>
         </>
       ) : (
         <section className="manage">
-          <div className="manage-head"><div><div className="eyebrow">ORDER DESK</div><h1>주문 관리</h1><p>접수된 주문을 확인하고 서영암농협 발주용으로 정리하세요.</p></div><div className="manage-actions"><button onClick={copyOrders} disabled={!orders.length}>발주 내용 복사</button><button className="outline" onClick={downloadCsv} disabled={!orders.length}>CSV 내려받기</button></div></div>
+          <div className="manage-head"><div><div className="eyebrow">ORDER DESK</div><h1>주문 관리</h1><p>접수된 주문을 확인하고 서영암농협 발주용으로 정리하세요.</p></div>{adminUnlocked && <div className="manage-actions"><button onClick={copyOrders} disabled={!orders.length}>발주 내용 복사</button><button className="outline" onClick={downloadCsv} disabled={!orders.length}>CSV 내려받기</button></div>}</div>
+          {!adminUnlocked ? <form className="admin-login" onSubmit={unlockOrders}><span>관리자 전용</span><h2>주문 목록을 확인하려면<br />비밀번호를 입력해 주세요.</h2><label>관리자 비밀번호<input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} required autoComplete="current-password" placeholder="비밀번호 입력" /></label><button type="submit" disabled={loading}>{loading ? "확인 중…" : "주문 목록 열기"}</button><p>소비자의 개인정보 보호를 위해 주문관리 화면은 하얀술 관리자만 볼 수 있습니다.</p></form> : <>
           <div className="stats"><article><span>총 주문</span><b>{orders.length}<small>건</small></b></article><article><span>총 수량</span><b>{summary.count}<small>포</small></b></article><article><span>10kg</span><b>{summary["10kg"]}<small>포</small></b></article><article><span>20kg</span><b>{summary["20kg"]}<small>포</small></b></article><article><span>총 금액</span><b>{money(summary.amount)}<small>원</small></b></article></div>
           <div className="order-list">
-            {!orders.length ? <div className="empty"><span>米</span><h2>아직 접수된 주문이 없어요</h2><p>주문하기에서 첫 주문을 등록해 주세요.</p><button onClick={() => setTab("order")}>주문 등록하기</button></div> : orders.map((order) => <article key={order.id}><div className="order-main"><span className="size-chip">{order.size}</span><div><h3>{order.name} <small>{order.phone}</small></h3><p>{order.address}</p></div></div><div className="order-meta"><span>{order.quantity}개</span><b>{money(order.total)}원</b><small>{new Date(order.createdAt).toLocaleString("ko-KR")}</small><button aria-label={`${order.name} 주문 삭제`} onClick={() => { if (confirm("이 주문을 삭제할까요?")) setOrders(orders.filter((item) => item.id !== order.id)); }}>삭제</button></div></article>)}
+            {!orders.length ? <div className="empty"><span>米</span><h2>아직 접수된 주문이 없어요</h2><p>주문하기에서 첫 주문을 등록해 주세요.</p><button onClick={() => setTab("order")}>주문 등록하기</button></div> : orders.map((order) => <article key={order.id}><div className="order-main"><span className="size-chip">{order.size}</span><div><h3>{order.name} <small>{order.phone}</small></h3><p>{order.address}</p></div></div><div className="order-meta"><span>{order.quantity}개</span><b>{money(order.total)}원</b><small>{new Date(order.createdAt).toLocaleString("ko-KR")}</small><button aria-label={`${order.name} 주문 삭제`} onClick={() => deleteOrder(order.id)}>삭제</button></div></article>)}
           </div>
-          <p className="local-note">이 주문 목록은 현재 기기에 저장됩니다. 다른 기기와 실시간으로 공유하려면 추후 온라인 데이터베이스 연결이 필요합니다.</p>
+          <p className="local-note">주문 내역은 Supabase에 안전하게 저장되어 여러 기기에서 확인할 수 있습니다.</p></>}
         </section>
       )}
 
