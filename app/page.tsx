@@ -47,14 +47,15 @@ export default function Home() {
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setLoading(true);
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const name = String(form.get("name"));
     try {
       const response = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, address: form.get("address"), phone: form.get("phone"), size, quantity }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
-      event.currentTarget.reset();
+      formElement.reset();
       setQuantity(1);
       setMessage(`${name}님의 주문이 접수되었습니다.`);
     } catch (error) {
