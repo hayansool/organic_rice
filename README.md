@@ -1,100 +1,29 @@
-# vinext-starter
+# 하얀술의 유기농 새청무 주문 앱
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+소비자가 유기농 새청무를 주문하고, 하얀술이 접수 내역을 확인해
+서영암농협 발주용 문장 또는 CSV 파일로 정리할 수 있는 앱입니다.
 
-## Prerequisites
+## 상품
 
-- Node.js `>=22.13.0`
+- 10kg: 39,000원
+- 20kg: 78,000원
 
-## Quick Start
+## GitHub와 Vercel에 배포하기
 
-```bash
-npm install
-npm run dev
-npm run build
-```
+1. GitHub에서 새 저장소를 만듭니다.
+2. 이 폴더의 파일을 저장소에 올립니다.
+3. Vercel에서 **Add New → Project**를 누르고 해당 GitHub 저장소를 선택합니다.
+4. Framework Preset이 **Next.js**인지 확인한 뒤 **Deploy**를 누릅니다.
+5. 배포 후 Vercel의 **Settings → Domains**에서 원하는 주소를 연결합니다.
 
-This starter does not use `wrangler.jsonc`.
+별도 환경 변수나 빌드 설정은 필요하지 않습니다.
 
-## Included Shape
+## 주문 데이터 안내
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+주문 목록은 브라우저의 로컬 저장소에 보관됩니다. 따라서 주문을 받은 기기와
+브라우저에서만 목록을 볼 수 있습니다. 여러 기기에서 주문을 함께 관리하려면
+향후 Supabase 같은 온라인 데이터베이스를 연결해야 합니다.
 
-## Workspace Auth Headers
+## 발주 주소 변경
 
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
-
-The user ID is stable for the same user on the same Site and different across Sites. Email and name are intended for display or contact purposes.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
-```
-
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+`app/page.tsx` 파일 위쪽의 `FARM_ADDRESS` 값을 변경하세요.
